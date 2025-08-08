@@ -114,14 +114,41 @@ if st.button("🔍 Get Answer") and st.session_state['pdf_content']:
         answer = generate_answers(st.session_state['pdf_content'], user_query)
         st.subheader("📘 Here's what I found:")
         st.text(answer)
+# User query
+user_query = st.text_input("💬 What would you like to know?")
 
-        # Friendly Feedback Section
-        st.markdown("### 😊 Was this helpful for you?")
-        helpful = st.radio("Please choose an option:", ("👍 Yes, it was super helpful!", "👎 Hmm, not really."))
+# Store feedback radio choice in session state to avoid re-selection after rerun
+if 'helpful_feedback' not in st.session_state:
+    st.session_state['helpful_feedback'] = None
 
-        # Suggestion box always visible for both answers
-        suggestion = st.text_area("💡 Got any ideas or suggestions? We’d love to hear how we can make this even better for you!")
+# Q&A Answer Section
+if st.button("🔍 Get Answer") and st.session_state['pdf_content']:
+    if user_query.strip() == "":
+        st.warning("Oops! Please type your question before clicking.")
+    else:
+        answer = generate_answers(st.session_state['pdf_content'], user_query)
+        st.subheader("📘 Here's what I found:")
+        st.markdown(answer)
 
-        if st.button("✅ Send Feedback"):
-            save_feedback(helpful, suggestion)
-            st.success("🎉 Thank you so much for your feedback! It truly helps us make learning joyful and effective for all children. 🌟💖")
+        # Feedback radio
+        st.markdown("### ✨ We'd love to know if this helped!")
+        helpful = st.radio("Please choose an option:", ("👍 Yes, it was super helpful!", "👎 Hmm, not really."), index=0, key="helpful_feedback")
+
+        # Save feedback button for radio feedback
+        if st.button("Submit Feedback on Answer"):
+            save_feedback(helpful, user_query)
+
+# ------------------------------------
+# 📝 Additional Feedback Section (open-form)
+# ------------------------------------
+
+st.subheader("✍️ Help Us Make It Even More Fun!🎨")
+
+feedback = st.text_area("🐞 Found something buggy or tricky? Let us know!👨‍👩‍👧‍👦", height=150)
+
+if st.button("🚀 Share and Help Us Grow!"):
+    if feedback.strip():
+        save_open_feedback(feedback)
+    else:
+        st.warning("⚠️ Please enter feedback before submitting.")
+
