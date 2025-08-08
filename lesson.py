@@ -8,32 +8,21 @@ import pandas as pd
 from datetime import datetime
 import openpyxl  # Required for Excel writing
 
-# -------------------------------
-# 🔐 Load Gemini API Key
-# -------------------------------
+# Load environment variables and API key
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
-
-if not api_key:
-    st.error("❌ Gemini API key not found in .env file.")
-    st.stop()
-
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
-# -------------------------------
-# 🧼 Clean text
-# -------------------------------
+# Clean and preprocess text
 def clean_text(text):
     return re.sub(r'\s+', ' ', text.strip().lower())
 
-# -------------------------------
-# 📄 Extract PDF content
-# -------------------------------
-def extract_text_from_pdf(pdf_file):
+# Extract text from PDF
+def extract_text_from_pdf(pdf_path):
     text = ""
     try:
-        reader = PdfReader(pdf_file)
+        reader = PdfReader(pdf_path)
         for page in reader.pages:
             page_text = page.extract_text()
             if page_text:
@@ -42,9 +31,7 @@ def extract_text_from_pdf(pdf_file):
         return f"Error reading PDF: {e}"
     return clean_text(text)
 
-# -------------------------------
-# 🤖 Gemini Answer Generation
-# -------------------------------
+# Gemini Q&A generation
 def generate_answers(content, query):
     prompt = f"""
 You are a helpful assistant trained to answer ONLY from the following preprimary phonics syllabus content:
@@ -52,6 +39,7 @@ You are a helpful assistant trained to answer ONLY from the following preprimary
 \"\"\" 
 {content} 
 \"\"\"
+
 
 Your job is to:
 - ONLY use the information provided in the syllabus
@@ -77,23 +65,28 @@ If the question is not related to the syllabus, gently reply:
 Now, answer the user's question:
 **{query}**
 """
+
     try:
         response = model.generate_content(prompt)
-        if response.text:
-            return response.text
+        if response.candidates and len(response.candidates) > 0:
+            candidate = response.candidates[0]
+            if hasattr(candidate, 'content') and candidate.content:
+                parts = getattr(candidate.content, 'parts', [])
+                return parts[0].text if parts else candidate.content.text
         return "No answer generated."
     except Exception as e:
         return f"Error: {str(e)}"
 
-# -------------------------------
-# 💾 Save Feedback (Radio + Text)
-# -------------------------------
+# Save feedback from radio buttons (helpful or not)
 def save_feedback(rating, suggestion):
     feedback_file = "feedback.xlsx"
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    feedback_data = {"Timestamp": [now], "Helpful": [rating], "Suggestion": [suggestion]}
+    feedback_data = {
+        "Timestamp": [now],
+        "Helpful": [rating],
+        "Suggestion": [suggestion]
+    }
     df_new = pd.DataFrame(feedback_data)
-
     try:
         if os.path.exists(feedback_file):
             df_existing = pd.read_excel(feedback_file)
@@ -101,17 +94,17 @@ def save_feedback(rating, suggestion):
         else:
             df_combined = df_new
         df_combined.to_excel(feedback_file, index=False)
-        st.success(f"✅ Feedback saved successfully!")
+        st.success(f"✅ Feedback saved successfully!\n📁 Saved at: `{os.path.abspath(feedback_file)}`")
     except PermissionError:
-        st.error("❌ Please close the feedback file before saving.")
+        st.error("❌ Permission denied: Please close the feedback Excel file if it is open.")
     except Exception as e:
         st.error(f"❌ Error saving feedback: {e}")
 
+# Save open-form textual feedback
 def save_open_feedback(feedback):
-    feedback_file = "feedback_data.xlsx"
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     new_entry = pd.DataFrame([[now, feedback]], columns=["Timestamp", "Feedback"])
-
+    feedback_file = "feedback_data.xlsx"
     try:
         if os.path.exists(feedback_file):
             old_df = pd.read_excel(feedback_file)
@@ -119,18 +112,16 @@ def save_open_feedback(feedback):
         else:
             df = new_entry
         df.to_excel(feedback_file, index=False)
-        st.success("✅ Thank you for your feedback!")
+        st.success("✅ Feedback saved successfully! Thank you for your input.")
     except PermissionError:
-        st.error("❌ Please close the feedback file before saving.")
+        st.error("❌ Permission denied: Please close the feedback Excel file if it is open.")
     except Exception as e:
         st.error(f"❌ Error saving feedback: {e}")
 
-# -------------------------------
-# 🎯 Streamlit UI
-# -------------------------------
+# Set up Streamlit
 st.set_page_config(page_title="Preprimary Syllabus Assistant")
 
-# Sidebar contact info
+# Sidebar Contact Info
 with st.sidebar:
     st.header("📬 Get in Touch")
     st.markdown("""
@@ -140,16 +131,14 @@ with st.sidebar:
 🔗 [LinkedIn](https://www.linkedin.com/in/mahwish-kiran-842945353)  
 
 _Made with ❤️ for every child's first step._
-""")
+    """)
 
-# Title and intro
+# Main Title & Intro
 st.title("🎒 Preprimary Syllabus Assistant")
-st.markdown("Hi there! 👋 Ask me anything about the lesson plan below — I’ll reply with clear, point-based answers.")
+st.markdown("Hi there! 👋 I'm here to help you explore the lesson plan. Ask me anything about phonics, monthly topics, or classroom activities listed in the plan below ⬇️")
 
-# -------------------------------
-# 📁 Load PDF
-# -------------------------------
-PDF_FILE_PATH = "yearly year lesson plan by mahwish.pdf"
+# Load PDF content
+PDF_FILE_PATH = r"yearly year lesson plan by mahwish.pdf.pdf"
 
 if 'pdf_content' not in st.session_state:
     st.session_state['pdf_content'] = extract_text_from_pdf(PDF_FILE_PATH)
@@ -157,49 +146,40 @@ if 'pdf_content' not in st.session_state:
 if st.session_state['pdf_content'].startswith("Error"):
     st.error(st.session_state['pdf_content'])
 
-# -------------------------------
-# 💬 User Query
-# -------------------------------
+# User query
 user_query = st.text_input("💬 What would you like to know?")
 
+# Store feedback radio choice in session state to avoid re-selection after rerun
 if 'helpful_feedback' not in st.session_state:
     st.session_state['helpful_feedback'] = None
 
-# -------------------------------
-# 📘 Answer Section
-# -------------------------------
+# Q&A Answer Section
 if st.button("🔍 Get Answer") and st.session_state['pdf_content']:
     if user_query.strip() == "":
-        st.warning("❗ Please enter a question.")
+        st.warning("Oops! Please type your question before clicking.")
     else:
         answer = generate_answers(st.session_state['pdf_content'], user_query)
         st.subheader("📘 Here's what I found:")
         st.markdown(answer)
 
         # Feedback radio
-        st.markdown("### ✨ Was this helpful?")
-        helpful = st.radio("Select an option:", 
-                           ("👍 Yes, it was super helpful!", "👎 Hmm, not really."), 
-                           key="helpful_feedback")
+        st.markdown("### ✨ We'd love to know if this helped!")
+        helpful = st.radio("Please choose an option:", ("👍 Yes, it was super helpful!", "👎 Hmm, not really."), index=0, key="helpful_feedback")
 
-        if st.button("✅ Submit Feedback"):
+        # Save feedback button for radio feedback
+        if st.button("Submit Feedback on Answer"):
             save_feedback(helpful, user_query)
 
-# -------------------------------
-# 📝 Open Text Feedback
-# -------------------------------
-st.subheader("✍️ Help Us Make It Even More Fun!")
-feedback = st.text_area("🐞 Found something buggy or tricky? Let us know!", height=150)
+# ------------------------------------
+# 📝 Additional Feedback Section (open-form)
+# ------------------------------------
 
-if st.button("🚀 Share Feedback"):
+st.subheader("✍️ Help Us Make It Even More Fun!🎨")
+
+feedback = st.text_area("🐞 Found something buggy or tricky? Let us know!👨‍👩‍👧‍👦", height=150)
+
+if st.button("🚀 Share and Help Us Grow!"):
     if feedback.strip():
         save_open_feedback(feedback)
     else:
-        st.warning("⚠️ Please write some feedback before submitting.")
-
-
-
-
-
-
-
+        st.warning("⚠️ Please enter feedback before submitting.")
