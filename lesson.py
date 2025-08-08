@@ -128,7 +128,7 @@ st.markdown("Hi there! 👋 I'm here to help you explore the lesson plan. Ask me
 # -------------------------------
 # 📁 Load PDF
 # -------------------------------
-PDF_FILE_PATH = "yearly year lesson plan by mahwish.pdf"
+PDF_FILE_PATH = "yearly year lesson plan by mahwish.pdf.pdf"
 
 if 'pdf_content' not in st.session_state:
     st.session_state['pdf_content'] = extract_text_from_pdf(PDF_FILE_PATH)
@@ -173,6 +173,7 @@ if st.button("🚀 Share and Help Us Grow!"):
         st.success("Feedback submitted. Thank you! 🙌")
     else:
         st.warning("⚠️ Please enter feedback before submitting.")
+
 
 
 
