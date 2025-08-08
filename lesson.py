@@ -94,7 +94,7 @@ st.title("🎒 Preprimary Syllabus Assistant")
 st.markdown("Hi there! 👋 I'm here to help you explore the lesson plan. Ask me anything about phonics, monthly topics, or classroom activities listed in the plan below ⬇️")
 
 # Local PDF Path
-PDF_FILE_PATH = r"yearly year lesson plan by mahwish.pdf.pdf "
+PDF_FILE_PATH = r"yearly year lesson plan by mahwish.pdf "
 
 # Load PDF once
 if 'pdf_content' not in st.session_state:
@@ -151,4 +151,5 @@ if st.button("🚀 Share and Help Us Grow!"):
         save_open_feedback(feedback)
     else:
         st.warning("⚠️ Please enter feedback before submitting.")
+
 
